@@ -28,7 +28,6 @@ class YOLOv9Classifier:
         self.batch_size = batch_size
         self.device = device
         self.optimizer_type = optimizer_type
-        self.dropout_rate = dropout_rate
         self.random_state = random_state
         self.epochs_logger = epochs_logger
 

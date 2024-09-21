@@ -10,6 +10,6 @@ names:
 - openedDoor
 - pole
 nc: 10
-test: /home/nord/Documents/GitHub/goit-cv-hw8/src/db/test/images
-train: /home/nord/Documents/GitHub/goit-cv-hw8/src/db/train/images
-val: /home/nord/Documents/GitHub/goit-cv-hw8/src/db/valid/images
+test: c:\Users\Acer\Documents\GitHub\goit-cv-hw8\src\db\test\images
+train: c:\Users\Acer\Documents\GitHub\goit-cv-hw8\src\db\train\images
+val: c:\Users\Acer\Documents\GitHub\goit-cv-hw8\src\db\valid\images
