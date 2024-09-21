@@ -10,7 +10,7 @@ class YOLOv9Classifier:
 
     def __init__(
         self,
-        model_name="yolov9e.pt",  # YOLOv9 model file
+        model_name="yolov9e",  # YOLOv9 model file
         lr=0.001,
         epochs=100,
         batch_size=32,
