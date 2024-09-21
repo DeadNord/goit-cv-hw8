@@ -16,10 +16,7 @@ class YOLOv9Classifier:
         batch_size=32,
         device="cpu",
         optimizer_type="auto",  # YOLO uses built-in optimizers
-        dropout_rate=0.0,
-        fraction=1.0,
         patience=20,
-        label_smoothing=0.0,
         random_state=None,
         epochs_logger=True,
     ):
@@ -32,10 +29,7 @@ class YOLOv9Classifier:
         self.batch_size = batch_size
         self.device = device
         self.optimizer_type = optimizer_type
-        self.dropout_rate = dropout_rate
-        self.fraction = fraction
         self.patience = patience
-        self.label_smoothing = label_smoothing
         self.random_state = random_state
         self.epochs_logger = epochs_logger
 
@@ -68,6 +62,7 @@ class YOLOv9Classifier:
         if data_yaml is None:
             raise ValueError("Data YAML file must be provided for YOLO training.")
 
+        # Here we keep only the supported parameters in the `train` method
         self.model.train(
             data=data_yaml,  # Path to dataset YAML file
             imgsz=imgsz,  # Image size
@@ -76,13 +71,10 @@ class YOLOv9Classifier:
             optimizer=self.optimizer_type,
             lr0=self.lr,
             device=self.device,
-            dropout=self.dropout_rate,
-            fraction=self.fraction,
             patience=self.patience,
-            label_smoothing=self.label_smoothing,
             name=name,
             val=True,
-            amp=True,
+            amp=True,  # Using automatic mixed precision
             exist_ok=True,
         )
 
