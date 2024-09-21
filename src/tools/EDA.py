@@ -1,7 +1,8 @@
 import matplotlib.pyplot as plt
-import numpy as np
-import torch
+import seaborn as sns
+import pandas as pd
 import matplotlib.patches as patches
+from IPython.display import display
 
 
 class EDA:
@@ -10,74 +11,99 @@ class EDA:
 
     Attributes
     ----------
-    yolo_dataloader : YOLODataLoader
-        The custom YOLODataLoader (train/val/test) to be analyzed.
+    yolo_loaders : dict
+        A dictionary containing 'train', 'valid', 'test' YOLODataLoader instances.
     class_names : list
         List of class names in the YOLODataLoader.
     """
 
-    def __init__(self, yolo_dataloader):
+    def __init__(self, yolo_loaders):
         """
         Constructs all the necessary attributes for the EDA object.
 
         Parameters
         ----------
-        yolo_dataloader : YOLODataLoader
-            The custom YOLODataLoader (train/val/test) to be analyzed.
+        yolo_loaders : dict
+            Dictionary containing 'train', 'valid', 'test' YOLODataLoader instances.
         """
-        self.dataloader = yolo_dataloader.get_loader()  # Access DataLoader from YOLODataLoader
-        self.class_names = yolo_dataloader.class_names  # Access class names from YOLODataLoader
+        self.yolo_loaders = yolo_loaders
+        self.class_names = list(yolo_loaders.values())[0].class_names
 
-    def show_sample_images(self, num_images=6):
+    def show_sample_images(self, num_images=6, loader_type="train"):
         """
-        Displays a grid of sample images from the dataloader with bounding boxes.
+        Displays a grid of sample images from the dataset.
 
         Parameters
         ----------
         num_images : int, optional
             Number of images to display (default is 6).
+        loader_type : str, optional
+            Specifies which DataLoader to use ('train', 'valid', 'test').
         """
-        # Get a batch of images from the DataLoader
-        images, labels = next(iter(self.dataloader))
+        images_shown = 0
+        num_cols = 3  # Set the number of columns
+        num_rows = (
+            num_images + num_cols - 1
+        ) // num_cols  # Calculate the number of rows dynamically
 
-        for i in range(min(num_images, len(images))):
-            self.imshow(images[i], labels[i])
+        fig, axes = plt.subplots(num_rows, num_cols, figsize=(15, 5 * num_rows))
 
-    def imshow(self, image, label):
+        dataloader = self.yolo_loaders[loader_type].get_loader()
+
+        for images, labels in dataloader:
+            for i in range(len(images)):
+                if images_shown >= num_images:
+                    break
+
+                row = images_shown // num_cols
+                col = images_shown % num_cols
+                ax = axes[row, col] if num_rows > 1 else axes[col]
+
+                ax.imshow(images[i])
+                ax.axis("off")
+                self.display_bboxes_on_image(ax, labels[i], images[i])
+                images_shown += 1
+
+            if images_shown >= num_images:
+                break
+
+        # Remove empty subplots
+        for j in range(images_shown, num_rows * num_cols):
+            fig.delaxes(
+                axes[j // num_cols, j % num_cols]
+                if num_rows > 1
+                else axes[j % num_cols]
+            )
+
+        plt.tight_layout()
+        plt.show()
+
+    def display_bboxes_on_image(self, ax, label, image):
         """
-        Helper function to display an image with its bounding boxes.
+        Helper function to display bounding boxes on an image.
 
         Parameters
         ----------
-        image : torch.Tensor
-            The tensor containing image data.
-        label : torch.Tensor
-            The tensor containing bounding box data.
+        ax : matplotlib axis
+            Axis to plot on.
+        label : list
+            List of labels containing bounding boxes.
+        image : PIL.Image
+            The image to display.
         """
-        # Convert image to numpy format
-        img = image.numpy().transpose(1, 2, 0)
-        img = np.clip(img, 0, 1)
+        if len(label) == 0:
+            return
 
-        # Check if the label is empty
-        if label.numel() == 0:
-            print("Warning: No labels for this image.")
-            return  # Skip images with no labels
-
-        fig, ax = plt.subplots(1)
-        ax.imshow(img)
-
-        # Plot bounding boxes
         for obj in label:
-            class_idx = int(obj[0])  # First value is the class index
-            x_center, y_center, width, height = obj[1:]  # Rest are bbox coordinates
+            class_idx = int(obj[0])
+            x_center, y_center, width, height = obj[1:]
 
             # Convert YOLO format (center x, center y, width, height) to (x_min, y_min, width, height)
-            x_min = (x_center - width / 2) * img.shape[1]
-            y_min = (y_center - height / 2) * img.shape[0]
-            width *= img.shape[1]
-            height *= img.shape[0]
+            x_min = (x_center - width / 2) * image.size[0]
+            y_min = (y_center - height / 2) * image.size[1]
+            width *= image.size[0]
+            height *= image.size[1]
 
-            # Create a rectangle patch
             rect = patches.Rectangle(
                 (x_min, y_min),
                 width,
@@ -87,7 +113,7 @@ class EDA:
                 facecolor="none",
             )
             ax.add_patch(rect)
-            plt.text(
+            ax.text(
                 x_min,
                 y_min,
                 self.class_names[class_idx],
@@ -96,57 +122,49 @@ class EDA:
                 bbox={"facecolor": "red", "alpha": 0.5, "pad": 1},
             )
 
-        plt.axis("off")
-        plt.show()
-        plt.close(fig)  # Закрываем текущую фигуру
-
-    def show_images_from_each_class(self):
-        """
-        Displays one image from each class in the dataset with bounding boxes.
-        """
-        images_per_class = {}
-
-        # Iterate through the DataLoader
-        for imgs, labels in self.dataloader:
-            for img, label in zip(imgs, labels):
-                if label.numel() > 0:  # Skip images with no labels
-                    for obj in label:
-                        class_idx = int(obj[0])  # Get class index
-                        class_name = self.class_names[class_idx]
-
-                        if class_name not in images_per_class:
-                            images_per_class[class_name] = (img, label)
-                        if len(images_per_class) == len(self.class_names):
-                            break
-            if len(images_per_class) == len(self.class_names):
-                break
-
-        plt.figure(figsize=(10, 10))
-        for i, (class_name, (img, label)) in enumerate(images_per_class.items()):
-            ax = plt.subplot(1, len(self.class_names), i + 1)
-            self.imshow(img, label)
-
     def plot_class_distribution(self):
         """
-        Plots the distribution of objects across different classes in the dataloader.
+        Plots the class distribution across different dataset modes (train/val/test).
         """
-        class_counts = [0] * len(self.class_names)
+        class_info = []
 
-        for _, labels in self.dataloader:
-            for label in labels:
-                if label.numel() > 0:  # Skip images with no labels
+        # Собираем информацию для каждого набора данных (train, valid, test)
+        for mode, loader in self.yolo_loaders.items():
+            mode_class_count = {
+                self.class_names[i]: 0 for i in range(len(self.class_names))
+            }
+
+            # Пробегаем по каждой партии данных в текущем DataLoader
+            for images, labels in loader.get_loader():
+                for label in labels:
                     for obj in label:
-                        class_idx = int(obj[0])
-                        class_counts[class_idx] += 1
+                        class_id = int(obj[0])
+                        mode_class_count[self.class_names[class_id]] += 1
 
-        plt.figure(figsize=(10, 6))
-        plt.bar(self.class_names, class_counts, color="blue")
-        plt.title("Class Distribution")
-        plt.xlabel("Classes")
-        plt.ylabel("Number of Objects")
+            class_info.append({**mode_class_count, "Mode": mode})
+
+        dataset_stats_df = pd.DataFrame(class_info)
+
+        # Визуализируем распределение классов для каждого набора
+        fig, axes = plt.subplots(1, len(self.yolo_loaders), figsize=(15, 5))
+        for i, (mode, loader) in enumerate(self.yolo_loaders.items()):
+            sns.barplot(
+                data=dataset_stats_df[dataset_stats_df["Mode"] == mode].drop(
+                    columns="Mode"
+                ),
+                orient="v",
+                ax=axes[i],
+                palette="Set2",
+            )
+            axes[i].set_title(f"{mode.capitalize()} Class Statistics")
+            axes[i].set_xlabel("Classes")
+            axes[i].set_ylabel("Count")
+            axes[i].tick_params(axis="x", rotation=90)
+
+        plt.tight_layout()
         plt.show()
 
-    def display_image_by_index(self, idx):
+    def display_image_by_index(self, idx, loader_type="train"):
         """
         Displays a specific image by its index in the dataloader with bounding boxes.
 
@@ -154,11 +172,14 @@ class EDA:
         ----------
         idx : int
             Index of the image to display.
+        loader_type : str
+            Specifies which DataLoader to use ('train', 'valid', 'test').
         """
-        # Find the image and label by index
         img, label = None, None
         count = 0
-        for imgs, labels in self.dataloader:
+        dataloader = self.yolo_loaders[loader_type].get_loader()
+
+        for imgs, labels in dataloader:
             for i in range(len(imgs)):
                 if count == idx:
                     img, label = imgs[i], labels[i]
@@ -168,14 +189,35 @@ class EDA:
                 break
 
         if img is not None:
-            self.imshow(img, label)
+            fig, ax = plt.subplots(1)
+            ax.imshow(img)
+            ax.axis("off")
+            self.display_bboxes_on_image(ax, label, img)
+            plt.show()
         else:
             print(f"Index {idx} is out of range.")
 
-    def show_image_shape(self):
+    def show_dataset_statistics(self):
         """
-        Displays the shape of the first image in the dataloader to verify dimensions.
+        Displays class statistics for train/valid/test datasets.
         """
-        images, _ = next(iter(self.dataloader))
-        for i, img in enumerate(images):
-            print(f"Shape of image {i}: {img.shape}")
+        class_info = []
+
+        # Собираем информацию для каждого набора данных (train, valid, test)
+        for mode, loader in self.yolo_loaders.items():
+            mode_class_count = {
+                self.class_names[i]: 0 for i in range(len(self.class_names))
+            }
+
+            # Пробегаем по каждой партии данных в текущем DataLoader
+            for images, labels in loader.get_loader():
+                for label in labels:
+                    for obj in label:
+                        class_id = int(obj[0])
+                        mode_class_count[self.class_names[class_id]] += 1
+
+            class_info.append({**mode_class_count, "Mode": mode})
+
+        # Преобразуем данные в DataFrame
+        dataset_stats_df = pd.DataFrame(class_info)
+        display(dataset_stats_df)
