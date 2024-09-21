@@ -10,12 +10,16 @@ class YOLOv9Classifier:
 
     def __init__(
         self,
-        model_name="yolov9e",  # YOLOv9 model file
+        model_name="yolov9e.pt",  # YOLOv9 model file
         lr=0.001,
         epochs=100,
         batch_size=32,
         device="cpu",
         optimizer_type="auto",  # YOLO uses built-in optimizers
+        dropout_rate=0.0,
+        fraction=1.0,
+        patience=20,
+        label_smoothing=0.0,
         random_state=None,
         epochs_logger=True,
     ):
@@ -28,6 +32,10 @@ class YOLOv9Classifier:
         self.batch_size = batch_size
         self.device = device
         self.optimizer_type = optimizer_type
+        self.dropout_rate = dropout_rate
+        self.fraction = fraction
+        self.patience = patience
+        self.label_smoothing = label_smoothing
         self.random_state = random_state
         self.epochs_logger = epochs_logger
 
@@ -53,7 +61,7 @@ class YOLOv9Classifier:
         for param, value in params.items():
             setattr(self, param, value)
 
-    def fit(self, data_yaml=None, imgsz=(640, 640)):
+    def fit(self, data_yaml=None, imgsz=(640, 640), name="experiment"):
         """
         Train the YOLOv9 model on the data. Handles both training and validation logic.
         """
@@ -68,6 +76,14 @@ class YOLOv9Classifier:
             optimizer=self.optimizer_type,
             lr0=self.lr,
             device=self.device,
+            dropout=self.dropout_rate,
+            fraction=self.fraction,
+            patience=self.patience,
+            label_smoothing=self.label_smoothing,
+            name=name,
+            val=True,
+            amp=True,
+            exist_ok=True,
         )
 
     def evaluate(self, data_yaml=None, imgsz=(640, 640)):
