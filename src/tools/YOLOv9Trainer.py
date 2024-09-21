@@ -2,10 +2,10 @@ from tqdm import tqdm
 from sklearn.model_selection import ParameterGrid
 
 
-class CNNTrainer:
+class YOLOv9Trainer:
     """
-    A class to train PyTorch CNN models with manual hyperparameter tuning.
-    Supports only classification tasks.
+    A class to train YOLOv9 models with manual hyperparameter tuning.
+    Supports object detection tasks.
     """
 
     def __init__(self, device="cpu"):
@@ -21,16 +21,15 @@ class CNNTrainer:
 
     def train(
         self,
-        train_dataset,
-        test_dataset,
         models,
         param_grids,
-        scoring="accuracy",
+        data_yaml,
+        scoring="mAP",
         verbose=0,
         use_progress_bar=True,
     ):
         """
-        Train the PyTorch CNN models using manual hyperparameter tuning.
+        Train the YOLOv9 models using manual hyperparameter tuning.
         """
         print(f"Training on device: {self.device}")
 
@@ -44,19 +43,13 @@ class CNNTrainer:
 
         for model_name, model in models.items():
             param_grid = param_grids[model_name]
-
             param_combinations = list(ParameterGrid(param_grid))
 
             for params in param_combinations:
-
                 print(f"\nTraining {model_name} with parameters: {params}")
                 model.set_params(**params)
 
-                model.device = self.device
-
-                epochs = params["epochs"]
-
-                def fold_callback(loss, epoch):
+                def fold_callback():
                     """
                     Колбек для обновления прогресса по эпохам в tqdm.
                     """
@@ -68,16 +61,21 @@ class CNNTrainer:
                 if verbose:
                     print(f"Training with parameters: {params}")
 
-                accuracy = model.fit(train_dataset, test_dataset)
+                # Train the model with train_loader and val_loader
+                model.fit(data_yaml=data_yaml)
+
+                # Here you might want to calculate mAP or other metrics using validation
+                metrics = model.evaluate(data_yaml=data_yaml)
+                score = metrics[scoring]
 
                 if verbose:
-                    print(f"Validation Accuracy for {model_name}: {accuracy}")
+                    print(f"Validation {scoring} for {model_name}: {score}")
 
-                self.best_scores[model_name] = accuracy
+                self.best_scores[model_name] = score
 
-                if accuracy > self.best_model_score:
+                if score > self.best_model_score:
                     self.best_model_name = model_name
-                    self.best_model_score = accuracy
+                    self.best_model_score = score
                     self.best_estimators[model_name] = model
                     self.best_params[model_name] = params
 
@@ -86,29 +84,4 @@ class CNNTrainer:
 
         print(
             f"\nBest Model: {self.best_model_name} with score: {self.best_model_score}"
-        )
-
-    def help(self):
-        """
-        Provides information on how to use the CNNTrainer class.
-        """
-        print("=== CNNTrainer Help ===")
-        print(
-            "This trainer is designed to support classification tasks using PyTorch CNN models."
-        )
-        print("\nUsage:")
-        print("1. Initialize the CNNTrainer with the device ('cpu' or 'cuda').")
-        print("   Example:")
-        print("       trainer = CNNTrainer(device='cuda')")
-        print(
-            "\n2. Create model objects and define the parameter grid for hyperparameter tuning."
-        )
-        print("   Example:")
-        print('       param_grid = { "lr": [0.001, 0.01], "epochs": [10, 20] }')
-        print(
-            "\n3. Call the `train` method with the training and test datasets, models, and parameter grid."
-        )
-        print("   Example:")
-        print(
-            "       trainer.train(train_dataset, test_dataset, models={'cnn_model': model}, param_grids={'cnn_model': param_grid})"
         )

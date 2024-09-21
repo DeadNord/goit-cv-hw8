@@ -11,23 +11,24 @@ class EDA:
 
     Attributes
     ----------
-    yolo_loaders : dict
-        A dictionary containing 'train', 'valid', 'test' YOLODataLoader instances.
+    yolo_loader : YOLODataLoader
+        An instance of YOLODataLoader that contains 'train', 'valid', and 'test' DataLoaders.
     class_names : list
         List of class names in the YOLODataLoader.
     """
 
-    def __init__(self, yolo_loaders):
+    def __init__(self, yolo_loader):
         """
         Constructs all the necessary attributes for the EDA object.
 
         Parameters
         ----------
-        yolo_loaders : dict
-            Dictionary containing 'train', 'valid', 'test' YOLODataLoader instances.
+        yolo_loader : YOLODataLoader
+            An instance of YOLODataLoader that contains 'train', 'valid', and 'test' DataLoaders.
         """
-        self.yolo_loaders = yolo_loaders
-        self.class_names = list(yolo_loaders.values())[0].class_names
+        self.yolo_loader = yolo_loader
+        # Получаем class_names из yolo_loader
+        self.class_names = yolo_loader.class_names
 
     def show_sample_images(self, num_images=6, loader_type="train"):
         """
@@ -48,7 +49,18 @@ class EDA:
 
         fig, axes = plt.subplots(num_rows, num_cols, figsize=(15, 5 * num_rows))
 
-        dataloader = self.yolo_loaders[loader_type].get_loader()
+        # Получаем DataLoader через метод get_loaders() объекта YOLODataLoader
+        dataloaders = self.yolo_loader.get_loaders()
+
+        # Заменяем индексы на числовые значения
+        if loader_type == "train":
+            dataloader = dataloaders[0]
+        elif loader_type == "valid":
+            dataloader = dataloaders[1]
+        elif loader_type == "test":
+            dataloader = dataloaders[2]
+        else:
+            raise ValueError("loader_type should be one of 'train', 'valid', or 'test'")
 
         for images, labels in dataloader:
             for i in range(len(images)):
@@ -128,14 +140,17 @@ class EDA:
         """
         class_info = []
 
+        # Получаем три лоадера (train, val, test)
+        train_loader, val_loader, test_loader = self.yolo_loader.get_loaders()
+        dataloaders = {"train": train_loader, "valid": val_loader, "test": test_loader}
+
         # Собираем информацию для каждого набора данных (train, valid, test)
-        for mode, loader in self.yolo_loaders.items():
+        for mode, dataloader in dataloaders.items():
             mode_class_count = {
                 self.class_names[i]: 0 for i in range(len(self.class_names))
             }
 
-            # Пробегаем по каждой партии данных в текущем DataLoader
-            for images, labels in loader.get_loader():
+            for images, labels in dataloader:
                 for label in labels:
                     for obj in label:
                         class_id = int(obj[0])
@@ -146,8 +161,8 @@ class EDA:
         dataset_stats_df = pd.DataFrame(class_info)
 
         # Визуализируем распределение классов для каждого набора
-        fig, axes = plt.subplots(1, len(self.yolo_loaders), figsize=(15, 5))
-        for i, (mode, loader) in enumerate(self.yolo_loaders.items()):
+        fig, axes = plt.subplots(1, len(dataloaders), figsize=(15, 5))
+        for i, (mode, dataloader) in enumerate(dataloaders.items()):
             sns.barplot(
                 data=dataset_stats_df[dataset_stats_df["Mode"] == mode].drop(
                     columns="Mode"
@@ -177,7 +192,8 @@ class EDA:
         """
         img, label = None, None
         count = 0
-        dataloader = self.yolo_loaders[loader_type].get_loader()
+        dataloaders = self.yolo_loader.get_loaders()
+        dataloader = dataloaders[loader_type]
 
         for imgs, labels in dataloader:
             for i in range(len(imgs)):
@@ -203,14 +219,18 @@ class EDA:
         """
         class_info = []
 
+        # Получаем три лоадера (train, val, test)
+        train_loader, val_loader, test_loader = self.yolo_loader.get_loaders()
+        dataloaders = {"train": train_loader, "valid": val_loader, "test": test_loader}
+
         # Собираем информацию для каждого набора данных (train, valid, test)
-        for mode, loader in self.yolo_loaders.items():
+        for mode, dataloader in dataloaders.items():
             mode_class_count = {
                 self.class_names[i]: 0 for i in range(len(self.class_names))
             }
 
             # Пробегаем по каждой партии данных в текущем DataLoader
-            for images, labels in loader.get_loader():
+            for images, labels in dataloader:
                 for label in labels:
                     for obj in label:
                         class_id = int(obj[0])

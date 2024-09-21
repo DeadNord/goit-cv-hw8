@@ -11,10 +11,12 @@ class YOLODataLoader:
 
     Attributes
     ----------
-    image_dir : str
-        Path to the directory containing images.
-    label_dir : str
-        Path to the directory containing labels in YOLO format.
+    train_dir : str
+        Path to the directory containing train images and labels.
+    val_dir : str
+        Path to the directory containing validation images and labels.
+    test_dir : str
+        Path to the directory containing test images and labels.
     batch_size : int
         The number of samples in each batch.
     shuffle : bool
@@ -23,8 +25,9 @@ class YOLODataLoader:
 
     def __init__(
         self,
-        image_dir,
-        label_dir,
+        train_dir,
+        val_dir,
+        test_dir,
         yaml_path=None,
         batch_size=8,
         shuffle=True,
@@ -32,10 +35,12 @@ class YOLODataLoader:
         """
         Parameters
         ----------
-        image_dir : str
-            Directory containing the images.
-        label_dir : str
-            Directory containing the labels.
+        train_dir : str
+            Directory containing the train images and labels.
+        val_dir : str
+            Directory containing the validation images and labels.
+        test_dir : str
+            Directory containing the test images and labels.
         yaml_path : str, optional
             Path to the YAML file with class names and other metadata.
         batch_size : int, optional
@@ -43,33 +48,53 @@ class YOLODataLoader:
         shuffle : bool, optional
             Whether to shuffle the dataset (default is True).
         """
-        self.image_dir = image_dir
-        self.label_dir = label_dir
+        self.train_dir = train_dir
+        self.val_dir = val_dir
+        self.test_dir = test_dir
         self.batch_size = batch_size
         self.shuffle = shuffle
 
-        self.image_filenames = [
-            f for f in os.listdir(self.image_dir)
-            if f.endswith((".png", ".jpg", ".jpeg"))
-        ]
+        self.train_image_dir = os.path.join(train_dir, "images")
+        self.train_label_dir = os.path.join(train_dir, "labels")
+
+        self.val_image_dir = os.path.join(val_dir, "images")
+        self.val_label_dir = os.path.join(val_dir, "labels")
+
+        self.test_image_dir = os.path.join(test_dir, "images")
+        self.test_label_dir = os.path.join(test_dir, "labels")
+
         self.class_names = self.load_yaml_classes(yaml_path) if yaml_path else []
 
-        # Create the dataset
-        self.dataset = YOLODataset(self.image_dir, self.label_dir)
+        # Create datasets
+        self.train_dataset = YOLODataset(self.train_image_dir, self.train_label_dir)
+        self.val_dataset = YOLODataset(self.val_image_dir, self.val_label_dir)
+        self.test_dataset = YOLODataset(self.test_image_dir, self.test_label_dir)
 
-        # Create the DataLoader
-        self.loader = DataLoader(
-            self.dataset,
+        # Create DataLoaders
+        self.train_loader = DataLoader(
+            self.train_dataset,
             batch_size=self.batch_size,
             shuffle=self.shuffle,
             collate_fn=self.collate_fn,
         )
+        self.val_loader = DataLoader(
+            self.val_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            collate_fn=self.collate_fn,
+        )
+        self.test_loader = DataLoader(
+            self.test_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            collate_fn=self.collate_fn,
+        )
 
-    def get_loader(self):
+    def get_loaders(self):
         """
-        Returns the DataLoader instance.
+        Returns train, val, and test DataLoader instances.
         """
-        return self.loader
+        return self.train_loader, self.val_loader, self.test_loader
 
     def load_yaml_classes(self, yaml_path):
         """
@@ -108,6 +133,31 @@ class YOLODataLoader:
         images, labels = zip(*batch)
         return list(images), list(labels)
 
+    def update_yaml_paths(self, yaml_path, output_yaml_path):
+        """
+        Update paths in the YAML file with the correct paths of the train, val, and test directories.
+
+        Parameters
+        ----------
+        yaml_path : str
+            Path to the original YAML file.
+        output_yaml_path : str
+            Path to save the updated YAML file with new paths for train, val, and test.
+        """
+        with open(yaml_path, "r") as file:
+            data = yaml.safe_load(file)
+
+        # Update the paths for train, val, and test with absolute paths
+        data["train"] = os.path.abspath(os.path.join(self.train_dir, "images"))
+        data["val"] = os.path.abspath(os.path.join(self.val_dir, "images"))
+        data["test"] = os.path.abspath(os.path.join(self.test_dir, "images"))
+
+        with open(output_yaml_path, "w") as file:
+            yaml.safe_dump(data, file)
+
+        print(f"YAML paths updated and saved to {output_yaml_path}")
+        return output_yaml_path
+
 
 class YOLODataset(Dataset):
     """
@@ -126,7 +176,8 @@ class YOLODataset(Dataset):
         self.image_dir = image_dir
         self.label_dir = label_dir
         self.image_filenames = [
-            f for f in os.listdir(self.image_dir)
+            f
+            for f in os.listdir(self.image_dir)
             if f.endswith((".png", ".jpg", ".jpeg"))
         ]
 

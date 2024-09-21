@@ -2,7 +2,7 @@ train: /content/data/train/images
 val: /content/data/valid/images
 test: /content/data/test/images
 nc: 10
-names: 
+names:
 - door
 - cabinetDoor
 - refrigeratorDoor

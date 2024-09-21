@@ -1,0 +1,15 @@
+names:
+- door
+- cabinetDoor
+- refrigeratorDoor
+- window
+- chair
+- table
+- cabinet
+- couch
+- openedDoor
+- pole
+nc: 10
+test: /home/nord/Documents/GitHub/goit-cv-hw8/src/db/test/images
+train: /home/nord/Documents/GitHub/goit-cv-hw8/src/db/train/images
+val: /home/nord/Documents/GitHub/goit-cv-hw8/src/db/valid/images
