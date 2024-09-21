@@ -16,7 +16,6 @@ class YOLOv9Classifier:
         batch_size=32,
         device="cpu",
         optimizer_type="auto",  # YOLO uses built-in optimizers
-        dropout_rate=0.5,
         random_state=None,
         epochs_logger=True,
     ):
