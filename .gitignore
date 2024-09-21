@@ -139,3 +139,4 @@ __pycache__/
 # Yolo
 *.pt
 runs/
+*.cache
