@@ -1,6 +1,7 @@
 import torch
 from ultralytics import YOLO
 import numpy as np
+import os
 
 
 class YOLOv9Classifier:
@@ -11,27 +12,59 @@ class YOLOv9Classifier:
     def __init__(
         self,
         model_name="yolov9e.pt",  # YOLOv9 model file
-        lr=0.001,
+        lr=1e-3,
+        lrf=0.01,
+        weight_decay=5e-4,
+        dropout=0.0,
+        fraction=1.0,
         epochs=100,
-        batch_size=32,
+        batch_size=4,  # Default taken from CFG
         device="cpu",
         optimizer_type="auto",  # YOLO uses built-in optimizers
         patience=20,
+        profile=False,
+        label_smoothing=0.0,
         random_state=None,
-        epochs_logger=True,
+        seed=42,
+        verbose=False,
+        exp_name="experiment",
+        data_yaml=None,
+        imgsz=(640, 640),
+        task="detect",
+        val=False,
+        amp=True,
+        exist_ok=True,
+        resume=False,
+        output_dir=".",
     ):
         """
         Initialize the YOLOv9 classifier with the provided architecture and hyperparameters.
         """
         self.model_name = model_name
+        self.task = task
         self.lr = lr
+        self.lrf = lrf
+        self.weight_decay = weight_decay
+        self.dropout = dropout
+        self.fraction = fraction
         self.epochs = epochs
         self.batch_size = batch_size
         self.device = device
         self.optimizer_type = optimizer_type
         self.patience = patience
+        self.profile = profile
+        self.label_smoothing = label_smoothing
         self.random_state = random_state
-        self.epochs_logger = epochs_logger
+        self.verbose = verbose
+        self.seed = seed
+        self.exp_name = exp_name
+        self.data_yaml = data_yaml
+        self.imgsz = imgsz
+        self.val = val
+        self.amp = amp
+        self.exist_ok = exist_ok
+        self.resume = resume
+        self.output_dir = output_dir
 
         # Load YOLO model
         self.model = YOLO(model_name)
@@ -55,39 +88,50 @@ class YOLOv9Classifier:
         for param, value in params.items():
             setattr(self, param, value)
 
-    def fit(self, data_yaml=None, imgsz=(640, 640), name="experiment"):
+    def fit(self):
         """
         Train the YOLOv9 model on the data. Handles both training and validation logic.
         """
-        if data_yaml is None:
+        if self.data_yaml is None:
             raise ValueError("Data YAML file must be provided for YOLO training.")
 
-        # Here we keep only the supported parameters in the `train` method
+        # Train the model using provided parameters
         self.model.train(
-            data=data_yaml,  # Path to dataset YAML file
-            imgsz=imgsz,  # Image size
+            data=self.data_yaml,  # Path to dataset YAML file
+            task=self.task,
+            imgsz=self.imgsz,  # Image size
             epochs=self.epochs,
             batch=self.batch_size,
             optimizer=self.optimizer_type,
             lr0=self.lr,
-            device=self.device,
+            lrf=self.lrf,
+            weight_decay=self.weight_decay,
+            dropout=self.dropout,
             patience=self.patience,
-            name=name,
-            val=True,
-            amp=True,  # Using automatic mixed precision
-            exist_ok=True,
+            fraction=self.fraction,
+            profile=self.profile,
+            label_smoothing=self.label_smoothing,
+            name=self.exp_name,
+            seed=self.seed,
+            val=self.val,
+            amp=self.amp,  # Using automatic mixed precision
+            exist_ok=self.exist_ok,
+            resume=self.resume,
+            device=self.device,
+            verbose=self.verbose,
+            project=self.output_dir,
         )
 
-    def evaluate(self, data_yaml=None, imgsz=(640, 640)):
+    def evaluate(self):
         """
         Evaluate the YOLOv9 model on the validation data.
         """
-        if data_yaml is None:
+        if self.data_yaml is None:
             raise ValueError("Data YAML file must be provided for YOLO evaluation.")
 
         metrics = self.model.val(
-            data=data_yaml,  # Path to dataset YAML file
-            imgsz=imgsz,
+            data=self.data_yaml,  # Path to dataset YAML file
+            imgsz=self.imgsz,
             batch=self.batch_size,
             device=self.device,
         )

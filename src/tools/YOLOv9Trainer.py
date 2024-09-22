@@ -1,4 +1,3 @@
-from tqdm import tqdm
 from sklearn.model_selection import ParameterGrid
 
 
@@ -23,10 +22,7 @@ class YOLOv9Trainer:
         self,
         models,
         param_grids,
-        data_yaml,
         scoring="mAP",
-        verbose=0,
-        use_progress_bar=True,
     ):
         """
         Train the YOLOv9 models using manual hyperparameter tuning.
@@ -38,9 +34,6 @@ class YOLOv9Trainer:
             param_combinations = list(ParameterGrid(param_grids[model_name]))
             total_iterations += sum([params["epochs"] for params in param_combinations])
 
-        if use_progress_bar:
-            pbar = tqdm(total=total_iterations, desc="Total Training Progress")
-
         for model_name, model in models.items():
             param_grid = param_grids[model_name]
             param_combinations = list(ParameterGrid(param_grid))
@@ -49,27 +42,12 @@ class YOLOv9Trainer:
                 print(f"\nTraining {model_name} with parameters: {params}")
                 model.set_params(**params)
 
-                def fold_callback():
-                    """
-                    Колбек для обновления прогресса по эпохам в tqdm.
-                    """
-                    if use_progress_bar and pbar is not None:
-                        pbar.update(1)
-
-                model.fold_callback = fold_callback
-
-                if verbose:
-                    print(f"Training with parameters: {params}")
-
                 # Train the model with train_loader and val_loader
-                model.fit(data_yaml=data_yaml)
+                model.fit()
 
                 # Here you might want to calculate mAP or other metrics using validation
-                metrics = model.evaluate(data_yaml=data_yaml)
+                metrics = model.evaluate()
                 score = metrics[scoring]
-
-                if verbose:
-                    print(f"Validation {scoring} for {model_name}: {score}")
 
                 self.best_scores[model_name] = score
 
@@ -78,9 +56,6 @@ class YOLOv9Trainer:
                     self.best_model_score = score
                     self.best_estimators[model_name] = model
                     self.best_params[model_name] = params
-
-        if use_progress_bar and pbar is not None:
-            pbar.close()
 
         print(
             f"\nBest Model: {self.best_model_name} with score: {self.best_model_score}"
