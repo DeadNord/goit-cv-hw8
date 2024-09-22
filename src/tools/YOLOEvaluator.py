@@ -1,7 +1,5 @@
-import torch
 import pandas as pd
 import matplotlib.pyplot as plt
-from torchsummary import summary
 import glob
 from PIL import Image
 from IPython.display import display
@@ -12,7 +10,7 @@ class YOLOEvaluator:
     A class to evaluate and display YOLO model performance results for object detection tasks.
     """
 
-    def __init__(self, output_dir, exp_name):
+    def __init__(self, full_output_dir):
         """
         Initialize the evaluator with the paths where model outputs are stored.
 
@@ -23,9 +21,8 @@ class YOLOEvaluator:
         exp_name : str
             Experiment name or folder where model results are stored.
         """
-        self.output_dir = output_dir
-        self.exp_name = exp_name
-        self.log_path = f"{self.output_dir}/{self.exp_name}/results.csv"
+        self.full_output_dir = full_output_dir
+        self.log_path = f"{self.full_output_dir}/results.csv"
 
     def load_training_logs(self):
         """
@@ -51,13 +48,10 @@ class YOLOEvaluator:
         """
         Displays the evaluation metrics for the best models and their parameters using the logs.
         """
-        # Load the training and validation logs
         df = self.load_training_logs()
 
-        # Извлечение финальных метрик
         final_results = df.iloc[-1]
 
-        # Извлечение метрик из логов
         results = [
             {
                 "Model": best_model_name,
@@ -83,7 +77,6 @@ class YOLOEvaluator:
             }
         )
 
-        # Display metrics
         print("Evaluation Metrics for Test Set:")
         display(results_df)
 
@@ -116,22 +109,22 @@ class YOLOEvaluator:
         """
         results_paths = [
             i
-            for i in glob.glob(f"{self.output_dir}/{self.exp_name}/*.png")
-            + glob.glob(f"{self.output_dir}/{self.exp_name}/*.jpg")
+            for i in glob.glob(f"{self.full_output_dir}/*.png")
+            + glob.glob(f"{self.full_output_dir}/*.jpg")
             if "batch" not in i
         ]
         results_paths = sorted(results_paths)
 
         if len(results_paths) == 0:
-            print(
-                f"No results found in the directory: {self.output_dir}/{self.exp_name}"
-            )
+            print(f"No results found in the directory: {self.full_output_dir}")
             return
 
         print(
-            f"Displaying {len(results_paths)} prediction images from {self.exp_name}:"
+            f"Displaying {len(results_paths)} prediction images from {self.full_output_dir}:"
         )
-        num_rows = len(results_paths) // num_columns + int(len(results_paths) % num_columns > 0)
+        num_rows = len(results_paths) // num_columns + int(
+            len(results_paths) % num_columns > 0
+        )
 
         fig, axes = plt.subplots(num_rows, num_columns, figsize=(15, num_rows * 5))
         axes = axes.flatten()
@@ -141,7 +134,6 @@ class YOLOEvaluator:
             axes[i].imshow(img)
             axes[i].axis("off")
 
-        # Turn off any remaining empty axes
         for j in range(i + 1, num_rows * num_columns):
             axes[j].axis("off")
 
@@ -156,7 +148,6 @@ class YOLOEvaluator:
 
         fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(10, 15), sharex=True)
 
-        # Training and Validation box_loss
         ax1.set_title("Box Loss")
         ax1.plot(
             df["epoch"],
@@ -176,7 +167,6 @@ class YOLOEvaluator:
         ax1.legend()
         ax1.grid(True)
 
-        # Training and Validation cls_loss
         ax2.set_title("Cls Loss")
         ax2.plot(
             df["epoch"],
@@ -196,7 +186,6 @@ class YOLOEvaluator:
         ax2.legend()
         ax2.grid(True)
 
-        # Training and Validation dfl_loss
         ax3.set_title("DFL Loss")
         ax3.plot(
             df["epoch"],
