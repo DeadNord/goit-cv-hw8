@@ -27,7 +27,6 @@ class EDA:
             An instance of YOLODataLoader that contains 'train', 'valid', and 'test' DataLoaders.
         """
         self.yolo_loader = yolo_loader
-        # Получаем class_names из yolo_loader
         self.class_names = yolo_loader.class_names
 
     def show_sample_images(self, num_images=6, loader_type="train"):
@@ -42,17 +41,13 @@ class EDA:
             Specifies which DataLoader to use ('train', 'valid', 'test').
         """
         images_shown = 0
-        num_cols = 3  # Set the number of columns
-        num_rows = (
-            num_images + num_cols - 1
-        ) // num_cols  # Calculate the number of rows dynamically
+        num_cols = 3
+        num_rows = (num_images + num_cols - 1) // num_cols
 
         fig, axes = plt.subplots(num_rows, num_cols, figsize=(15, 5 * num_rows))
 
-        # Получаем DataLoader через метод get_loaders() объекта YOLODataLoader
         dataloaders = self.yolo_loader.get_loaders()
 
-        # Заменяем индексы на числовые значения
         if loader_type == "train":
             dataloader = dataloaders[0]
         elif loader_type == "valid":
@@ -79,7 +74,6 @@ class EDA:
             if images_shown >= num_images:
                 break
 
-        # Remove empty subplots
         for j in range(images_shown, num_rows * num_cols):
             fig.delaxes(
                 axes[j // num_cols, j % num_cols]
@@ -110,7 +104,6 @@ class EDA:
             class_idx = int(obj[0])
             x_center, y_center, width, height = obj[1:]
 
-            # Convert YOLO format (center x, center y, width, height) to (x_min, y_min, width, height)
             x_min = (x_center - width / 2) * image.size[0]
             y_min = (y_center - height / 2) * image.size[1]
             width *= image.size[0]
@@ -140,11 +133,9 @@ class EDA:
         """
         class_info = []
 
-        # Получаем три лоадера (train, val, test)
         train_loader, val_loader, test_loader = self.yolo_loader.get_loaders()
         dataloaders = {"train": train_loader, "valid": val_loader, "test": test_loader}
 
-        # Собираем информацию для каждого набора данных (train, valid, test)
         for mode, dataloader in dataloaders.items():
             mode_class_count = {
                 self.class_names[i]: 0 for i in range(len(self.class_names))
@@ -160,7 +151,6 @@ class EDA:
 
         dataset_stats_df = pd.DataFrame(class_info)
 
-        # Визуализируем распределение классов для каждого набора
         fig, axes = plt.subplots(1, len(dataloaders), figsize=(15, 5))
         for i, (mode, dataloader) in enumerate(dataloaders.items()):
             sns.barplot(
@@ -219,17 +209,14 @@ class EDA:
         """
         class_info = []
 
-        # Получаем три лоадера (train, val, test)
         train_loader, val_loader, test_loader = self.yolo_loader.get_loaders()
         dataloaders = {"train": train_loader, "valid": val_loader, "test": test_loader}
 
-        # Собираем информацию для каждого набора данных (train, valid, test)
         for mode, dataloader in dataloaders.items():
             mode_class_count = {
                 self.class_names[i]: 0 for i in range(len(self.class_names))
             }
 
-            # Пробегаем по каждой партии данных в текущем DataLoader
             for images, labels in dataloader:
                 for label in labels:
                     for obj in label:
@@ -238,6 +225,5 @@ class EDA:
 
             class_info.append({**mode_class_count, "Mode": mode})
 
-        # Преобразуем данные в DataFrame
         dataset_stats_df = pd.DataFrame(class_info)
         display(dataset_stats_df)

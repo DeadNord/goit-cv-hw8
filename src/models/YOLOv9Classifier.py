@@ -1,7 +1,6 @@
 import torch
 from ultralytics import YOLO
 import numpy as np
-import os
 
 
 class YOLOv9Classifier:
@@ -11,16 +10,16 @@ class YOLOv9Classifier:
 
     def __init__(
         self,
-        model_name="yolov9e.pt",  # YOLOv9 model file
+        model_name="yolov9e.pt",
         lr=1e-3,
         lrf=0.01,
         weight_decay=5e-4,
         dropout=0.0,
         fraction=1.0,
         epochs=100,
-        batch_size=4,  # Default taken from CFG
+        batch_size=4,
         device="cpu",
-        optimizer_type="auto",  # YOLO uses built-in optimizers
+        optimizer_type="auto",
         patience=20,
         profile=False,
         label_smoothing=0.0,
@@ -66,7 +65,6 @@ class YOLOv9Classifier:
         self.resume = resume
         self.output_dir = output_dir
 
-        # Load YOLO model
         self.model = YOLO(model_name)
 
         if random_state is not None:
@@ -95,11 +93,10 @@ class YOLOv9Classifier:
         if self.data_yaml is None:
             raise ValueError("Data YAML file must be provided for YOLO training.")
 
-        # Train the model using provided parameters
         self.model.train(
-            data=self.data_yaml,  # Path to dataset YAML file
+            data=self.data_yaml,
             task=self.task,
-            imgsz=self.imgsz,  # Image size
+            imgsz=self.imgsz,
             epochs=self.epochs,
             batch=self.batch_size,
             optimizer=self.optimizer_type,
@@ -114,7 +111,7 @@ class YOLOv9Classifier:
             name=self.exp_name,
             seed=self.seed,
             val=self.val,
-            amp=self.amp,  # Using automatic mixed precision
+            amp=self.amp,
             exist_ok=self.exist_ok,
             resume=self.resume,
             device=self.device,
@@ -130,7 +127,7 @@ class YOLOv9Classifier:
             raise ValueError("Data YAML file must be provided for YOLO evaluation.")
 
         metrics = self.model.val(
-            data=self.data_yaml,  # Path to dataset YAML file
+            data=self.data_yaml,
             imgsz=self.imgsz,
             batch=self.batch_size,
             device=self.device,

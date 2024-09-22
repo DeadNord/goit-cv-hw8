@@ -18,12 +18,7 @@ class YOLOv9Trainer:
         self.best_model_name = None
         self.best_model_score = float("-inf")
 
-    def train(
-        self,
-        models,
-        param_grids,
-        scoring="mAP",
-    ):
+    def train(self, models, param_grids):
         """
         Train the YOLOv9 models using manual hyperparameter tuning.
         """
@@ -42,12 +37,11 @@ class YOLOv9Trainer:
                 print(f"\nTraining {model_name} with parameters: {params}")
                 model.set_params(**params)
 
-                # Train the model with train_loader and val_loader
                 model.fit()
 
-                # Here you might want to calculate mAP or other metrics using validation
                 metrics = model.evaluate()
-                score = metrics[scoring]
+
+                score = metrics.box.map
 
                 self.best_scores[model_name] = score
 

@@ -1,22 +1,15 @@
 import torch
-from sklearn.metrics import (
-    accuracy_score,
-    f1_score,
-    precision_score,
-    recall_score,
-    balanced_accuracy_score,
-)
-from IPython.display import display
 import pandas as pd
 import matplotlib.pyplot as plt
 from torchsummary import summary
 import glob
 from PIL import Image
+from IPython.display import display
 
 
 class YOLOEvaluator:
     """
-    A class to evaluate and display PyTorch CNN model performance results for classification tasks.
+    A class to evaluate and display YOLO model performance results for object detection tasks.
     """
 
     def __init__(self, output_dir, exp_name):
@@ -32,103 +25,7 @@ class YOLOEvaluator:
         """
         self.output_dir = output_dir
         self.exp_name = exp_name
-
-    def display_results(
-        self,
-        test_dataset,
-        best_models,
-        best_params,
-        best_scores,
-        best_model_name,
-        help_text=False,
-    ):
-        """
-        Displays the evaluation metrics for the best models and their parameters using the test dataset.
-        """
-        results = []
-
-        for model_name, cnn_model in best_models.items():
-            all_preds, all_targets, val_loss, val_accuracy = cnn_model._evaluate(
-                test_dataset
-            )
-
-            accuracy = accuracy_score(all_targets, all_preds)
-            balanced_acc = balanced_accuracy_score(all_targets, all_preds)
-            f1 = f1_score(all_targets, all_preds, average="weighted")
-            precision = precision_score(all_targets, all_preds, average="weighted")
-            recall = recall_score(all_targets, all_preds, average="weighted")
-
-            results.append(
-                {
-                    "Model": model_name,
-                    "Accuracy": accuracy,
-                    "Balanced Accuracy": balanced_acc,
-                    "F1 Score": f1,
-                    "Precision": precision,
-                    "Recall": recall,
-                }
-            )
-
-        results_df = pd.DataFrame(results).sort_values(by="Accuracy", ascending=False)
-        param_df = (
-            pd.DataFrame(best_params).T.reset_index().rename(columns={"index": "Model"})
-        )
-
-        best_model_df = pd.DataFrame(
-            {
-                "Overall Best Model": [best_model_name],
-                "Score (based on cross-validation score)": [
-                    best_scores[best_model_name]
-                ],
-            }
-        )
-
-        # Display metrics
-        print("Evaluation Metrics for Test Set:")
-        display(results_df)
-
-        print("\nBest Parameters for Each Model (found during hyperparameter tuning):")
-        display(param_df)
-
-        print("\nOverall Best Model and Score (based on cross-validation score):")
-        display(best_model_df)
-
-        if help_text:
-            print("\nMetric Explanations for Classification:")
-            print(
-                "Accuracy: The ratio of correctly predicted instances to the total instances."
-            )
-            print("Balanced Accuracy: The average of recall obtained on each class.")
-            print("F1 Score: Harmonic mean of precision and recall.")
-            print(
-                "Precision: Ratio of correctly predicted positive observations to all positive predictions."
-            )
-            print(
-                "Recall: Ratio of correctly predicted positive observations to all actual positives."
-            )
-
-    def display_predictions(self):
-        """
-        Display predicted images from the model's output folder.
-        """
-        results_paths = [
-            i for i in
-            glob.glob(f'{self.output_dir}/{self.exp_name}/*.png') +
-            glob.glob(f'{self.output_dir}/{self.exp_name}/*.jpg')
-            if 'batch' not in i
-        ]
-        results_paths = sorted(results_paths)
-
-        if len(results_paths) == 0:
-            print(f"No results found in the directory: {self.output_dir}/{self.exp_name}")
-            return
-
-        print(f"Displaying {len(results_paths)} prediction images from {self.exp_name}:")
-        for file in results_paths:
-            img = Image.open(file)
-            plt.imshow(img)
-            plt.axis('off')
-            plt.show()
+        self.log_path = f"{self.output_dir}/{self.exp_name}/results.csv"
 
     def load_training_logs(self):
         """
@@ -139,11 +36,117 @@ class YOLOEvaluator:
         df : pandas.DataFrame
             The DataFrame containing the training logs.
         """
-        log_path = f'{self.output_dir}/{self.exp_name}/results.csv'
-        df = pd.read_csv(log_path)
+        df = pd.read_csv(self.log_path)
         df = df.rename(columns=lambda x: x.replace(" ", ""))
-        df.to_csv(f'{self.output_dir}/training_log_df.csv', index=False)
         return df
+
+    def display_results(
+        self,
+        best_models,
+        best_params,
+        best_scores,
+        best_model_name,
+        help_text=False,
+    ):
+        """
+        Displays the evaluation metrics for the best models and their parameters using the logs.
+        """
+        # Load the training and validation logs
+        df = self.load_training_logs()
+
+        # Извлечение финальных метрик
+        final_results = df.iloc[-1]
+
+        # Извлечение метрик из логов
+        results = [
+            {
+                "Model": best_model_name,
+                "Precision": final_results.get("metrics/precision(B)", "N/A"),
+                "Recall": final_results.get("metrics/recall(B)", "N/A"),
+                "mAP 50": final_results.get("metrics/mAP50(B)", "N/A"),
+                "mAP 50-95": final_results.get("metrics/mAP50-95(B)", "N/A"),
+                "Validation Box Loss": final_results.get("val/box_loss", "N/A"),
+                "Validation Cls Loss": final_results.get("val/cls_loss", "N/A"),
+                "Validation DFL Loss": final_results.get("val/dfl_loss", "N/A"),
+            }
+        ]
+
+        results_df = pd.DataFrame(results)
+
+        param_df = (
+            pd.DataFrame(best_params).T.reset_index().rename(columns={"index": "Model"})
+        )
+        best_model_df = pd.DataFrame(
+            {
+                "Overall Best Model": [best_model_name],
+                "Score (mAP 50-95)": [best_scores.get(best_model_name, "N/A")],
+            }
+        )
+
+        # Display metrics
+        print("Evaluation Metrics for Test Set:")
+        display(results_df)
+
+        print("\nBest Parameters for Each Model (found during hyperparameter tuning):")
+        display(param_df)
+
+        print("\nOverall Best Model and Score (based on validation mAP):")
+        display(best_model_df)
+
+        if help_text:
+            print("\nMetric Explanations for Object Detection:")
+            print("Box Loss: Localization loss (bounding box).")
+            print("Cls Loss: Classification loss (object type).")
+            print("DFL Loss: Distribution Focal Loss.")
+            print("Precision: Ratio of correctly predicted positives.")
+            print("Recall: Ratio of correctly predicted actual positives.")
+            print("mAP 50: Mean Average Precision at IoU threshold 0.5.")
+            print(
+                "mAP 50-95: Mean Average Precision across IoU thresholds 0.5 to 0.95."
+            )
+
+    def display_predictions(self, num_columns=3):
+        """
+        Display predicted images from the model's output folder in a grid.
+
+        Parameters
+        ----------
+        num_columns : int
+            Number of columns for displaying images in a grid.
+        """
+        results_paths = [
+            i
+            for i in glob.glob(f"{self.output_dir}/{self.exp_name}/*.png")
+            + glob.glob(f"{self.output_dir}/{self.exp_name}/*.jpg")
+            if "batch" not in i
+        ]
+        results_paths = sorted(results_paths)
+
+        if len(results_paths) == 0:
+            print(
+                f"No results found in the directory: {self.output_dir}/{self.exp_name}"
+            )
+            return
+
+        print(
+            f"Displaying {len(results_paths)} prediction images from {self.exp_name}:"
+        )
+        num_rows = len(results_paths) // num_columns + int(len(results_paths) % num_columns > 0)
+
+        fig, axes = plt.subplots(num_rows, num_columns, figsize=(15, num_rows * 5))
+        axes = axes.flatten()
+
+        for i, file in enumerate(results_paths):
+            img = Image.open(file)
+            axes[i].imshow(img)
+            axes[i].axis("off")
+
+        # Turn off any remaining empty axes
+        for j in range(i + 1, num_rows * num_columns):
+            axes[j].axis("off")
+
+        plt.tight_layout()
+        plt.show()
 
     def plot_training_metrics(self):
         """
@@ -154,113 +157,85 @@ class YOLOEvaluator:
         fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(10, 15), sharex=True)
 
         # Training and Validation box_loss
-        ax1.set_title('Box Loss')
-        ax1.plot(df['epoch'], df['train/box_loss'], label='Training box_loss', marker='o', linestyle='-')
-        ax1.plot(df['epoch'], df['val/box_loss'], label='Validation box_loss', marker='o', linestyle='-')
-        ax1.set_ylabel('Box Loss')
+        ax1.set_title("Box Loss")
+        ax1.plot(
+            df["epoch"],
+            df["train/box_loss"],
+            label="Training box_loss",
+            marker="o",
+            linestyle="-",
+        )
+        ax1.plot(
+            df["epoch"],
+            df["val/box_loss"],
+            label="Validation box_loss",
+            marker="o",
+            linestyle="-",
+        )
+        ax1.set_ylabel("Box Loss")
         ax1.legend()
         ax1.grid(True)
 
         # Training and Validation cls_loss
-        ax2.set_title('Cls Loss')
-        ax2.plot(df['epoch'], df['train/cls_loss'], label='Training cls_loss', marker='o', linestyle='-')
-        ax2.plot(df['epoch'], df['val/cls_loss'], label='Validation cls_loss', marker='o', linestyle='-')
-        ax2.set_ylabel('Cls Loss')
+        ax2.set_title("Cls Loss")
+        ax2.plot(
+            df["epoch"],
+            df["train/cls_loss"],
+            label="Training cls_loss",
+            marker="o",
+            linestyle="-",
+        )
+        ax2.plot(
+            df["epoch"],
+            df["val/cls_loss"],
+            label="Validation cls_loss",
+            marker="o",
+            linestyle="-",
+        )
+        ax2.set_ylabel("Cls Loss")
         ax2.legend()
         ax2.grid(True)
 
         # Training and Validation dfl_loss
-        ax3.set_title('DFL Loss')
-        ax3.plot(df['epoch'], df['train/dfl_loss'], label='Training dfl_loss', marker='o', linestyle='-')
-        ax3.plot(df['epoch'], df['val/dfl_loss'], label='Validation dfl_loss', marker='o', linestyle='-')
-        ax3.set_xlabel('Epochs')
-        ax3.set_ylabel('DFL Loss')
+        ax3.set_title("DFL Loss")
+        ax3.plot(
+            df["epoch"],
+            df["train/dfl_loss"],
+            label="Training dfl_loss",
+            marker="o",
+            linestyle="-",
+        )
+        ax3.plot(
+            df["epoch"],
+            df["val/dfl_loss"],
+            label="Validation dfl_loss",
+            marker="o",
+            linestyle="-",
+        )
+        ax3.set_xlabel("Epochs")
+        ax3.set_ylabel("DFL Loss")
         ax3.legend()
         ax3.grid(True)
 
-        plt.suptitle('Training Metrics vs. Epochs')
+        plt.suptitle("Training Metrics vs. Epochs")
         plt.show()
 
-    def plot_loss_history(self, best_models, best_model_name):
+    def plot_map_history(self):
         """
-        Plots the training and validation loss history of the provided PyTorch model.
-
-        Parameters
-        ----------
-        best_models : dict
-            Dictionary of best models from GridSearchCV.
-        best_model_name : str
-            Name of the best model to plot the loss history.
+        Plot the mAP 50 and mAP 50-95 history of the YOLO model from logs.
         """
-        best_model = best_models[best_model_name]
+        df = self.load_training_logs()
 
-        if hasattr(best_model, "train_loss_history") and hasattr(
-            best_model, "val_loss_history"
-        ):
-            plt.plot(best_model.train_loss_history, label="Training Loss")
-            plt.plot(
-                best_model.val_loss_history,
-                label="Validation Loss",
-                color="orange",
-            )
-            plt.title("Training vs Validation Loss per Epoch")
-            plt.xlabel("Epochs")
-            plt.ylabel("Loss")
-            plt.legend()
-            plt.show()
-        else:
-            print("The provided model does not have a loss history.")
-
-    def plot_accuracy_history(self, best_models, best_model_name):
-        """
-        Plots the training and validation accuracy history of the provided PyTorch model.
-
-        Parameters
-        ----------
-        best_models : dict
-            Dictionary of best models from GridSearchCV.
-        best_model_name : str
-            Name of the best model to plot the accuracy history.
-        """
-        best_model = best_models[best_model_name]
-
-        if hasattr(best_model, "train_accuracy_history") and hasattr(
-            best_model, "val_accuracy_history"
-        ):
-            plt.plot(best_model.train_accuracy_history, label="Training Accuracy")
-            plt.plot(
-                best_model.val_accuracy_history,
-                label="Validation Accuracy",
-                color="orange",
-            )
-            plt.title("Training vs Validation Accuracy per Epoch")
-            plt.xlabel("Epochs")
-            plt.ylabel("Accuracy")
-            plt.legend()
-            plt.show()
-        else:
-            print("The provided model does not have an accuracy history.")
-
-    def visualize_pipeline(self, model_name, best_models):
-        """
-        Visualizes the structure of a PyTorch model within the best models.
-
-        Parameters
-        ----------
-        model_name : str
-            The name of the model to visualize.
-        best_models : dict
-            A dictionary containing the best models.
-        """
-        best_model = best_models.get(model_name)
-        if best_model is None:
-            raise ValueError(f"Model with name {model_name} not found in best_models.")
-
-        model = best_model.model
-        if isinstance(model, torch.nn.Module):
-            print(f"Visualizing the architecture of the model: {model_name}")
-            summary(model, input_size=(3, 224, 224))
-        else:
-            raise ValueError(
-                f"Model {model_name} is not a PyTorch nn.Module, but {type(model)}"
-            )
+        plt.plot(df["epoch"], df["metrics/mAP50(B)"], label="mAP@50")
+        plt.plot(
+            df["epoch"],
+            df["metrics/mAP50-95(B)"],
+            label="mAP@50:95",
+            color="orange",
+        )
+        plt.title("mAP@50 and mAP@50:95 over Epochs")
+        plt.xlabel("Epochs")
+        plt.ylabel("mAP")
+        plt.legend()
+        plt.grid(True)
+        plt.show()

@@ -116,7 +116,6 @@ class YOLODataLoader:
         with open(yaml_path, "r") as file:
             data = yaml.safe_load(file)
 
-        # Extract the class names from the YAML file
         class_names = data.get("names", [])
 
         if not class_names:
@@ -201,7 +200,6 @@ class YOLODataset(Dataset):
         label : list
             List of labels (bounding boxes and classes) for the image.
         """
-        # Load the image
         img_filename = self.image_filenames[idx]
         img_path = os.path.join(self.image_dir, img_filename)
         image = Image.open(img_path).convert("RGB")
@@ -217,9 +215,8 @@ class YOLODataset(Dataset):
         if os.path.exists(label_path):
             with open(label_path, "r") as f:
                 label_data = f.readlines()
-            # Convert the label data to a list of floats
             label = [list(map(float, line.strip().split())) for line in label_data]
         else:
-            label = []  # If no label, return an empty list
+            label = []
 
         return image, label
